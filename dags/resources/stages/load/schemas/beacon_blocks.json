@@ -1,125 +1,479 @@
 [
     {
-        "name": "level",
-        "type": "INTEGER",
-        "description": "The height of the block, from the genesis block",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "proto",
-        "type": "INTEGER",
-        "description": "Number of protocol changes since genesis (mod 256)",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "predecessor",
-        "type": "STRING",
-        "description": "The hash of the preceding block",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "timestamp",
+        "name": "block_timestamp",
         "type": "TIMESTAMP",
-        "description": "The timestamp at which the block is claimed to have been created",
-        "mode": "REQUIRED"
+        "mode": "NULLABLE"
     },
     {
-        "name": "validation_pass",
-        "type": "INTEGER",
-        "description": "Number of validation passes (also number of lists of lists of operations)",
-        "mode": "REQUIRED"
+        "name": "beacon_block",
+        "type": "RECORD",
+        "mode": "NULLABLE",
+        "fields": [
+            {
+                "name": "signature",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "message",
+                "type": "RECORD",
+                "mode": "NULLABLE",
+                "fields": [
+                    {
+                        "name": "state_root",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "proposer_index",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "body",
+                        "type": "RECORD",
+                        "mode": "NULLABLE",
+                        "fields": [
+                             {
+                                "name": "voluntary_exits",
+                                "type": "RECORD",
+                                "mode": "REPEATED",
+                                "fields": [
+                                    {
+                                        "name": "signature",
+                                        "type": "STRING",
+                                        "mode": "NULLABLE"
+                                    },
+                                    {
+                                        "name": "message",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "validator_index",
+                                                "type": "INTEGER",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "epoch",
+                                                "type": "INTEGER",
+                                                "mode": "NULLABLE"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "attestations",
+                                "type": "RECORD",
+                                "mode": "REPEATED",
+                                "fields": [
+                                    {
+                                        "name": "signature",
+                                        "type": "STRING",
+                                        "mode": "NULLABLE"
+                                    },
+                                    {
+                                        "name": "data",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "target",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "epoch",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "beacon_block_root",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "source",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "epoch",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "index",
+                                                "type": "INTEGER",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "slot",
+                                                "type": "INTEGER",
+                                                "mode": "NULLABLE"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "aggregation_bits",
+                                        "type": "STRING",
+                                        "mode": "NULLABLE"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "proposer_slashings",
+                                "type": "RECORD",
+                                "mode": "REPEATED",
+                                "fields": [
+                                    {
+                                        "name": "header_2",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "signature",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "message",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "body_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "state_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "proposer_index",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "parent_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "slot",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "header_1",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "signature",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "message",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "body_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "state_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "proposer_index",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "parent_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "slot",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth1_data",
+                                "type": "RECORD",
+                                "mode": "NULLABLE",
+                                "fields": [
+                                    {
+                                        "name": "block_hash",
+                                        "type": "STRING",
+                                        "mode": "NULLABLE"
+                                    },
+                                    {
+                                        "name": "deposit_count",
+                                        "type": "INTEGER",
+                                        "mode": "NULLABLE"
+                                    },
+                                    {
+                                        "name": "deposit_root",
+                                        "type": "STRING",
+                                        "mode": "NULLABLE"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "attester_slashings",
+                                "type": "RECORD",
+                                "mode": "REPEATED",
+                                "fields": [
+                                    {
+                                        "name": "attestation_2",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "signature",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "data",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "target",
+                                                        "type": "RECORD",
+                                                        "mode": "NULLABLE",
+                                                        "fields": [
+                                                            {
+                                                                "name": "root",
+                                                                "type": "STRING",
+                                                                "mode": "NULLABLE"
+                                                            },
+                                                            {
+                                                                "name": "epoch",
+                                                                "type": "INTEGER",
+                                                                "mode": "NULLABLE"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "beacon_block_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "source",
+                                                        "type": "RECORD",
+                                                        "mode": "NULLABLE",
+                                                        "fields": [
+                                                            {
+                                                                "name": "root",
+                                                                "type": "STRING",
+                                                                "mode": "NULLABLE"
+                                                            },
+                                                            {
+                                                                "name": "epoch",
+                                                                "type": "INTEGER",
+                                                                "mode": "NULLABLE"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "index",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "slot",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "attesting_indices",
+                                                "type": "INTEGER",
+                                                "mode": "REPEATED"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "attestation_1",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "signature",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "data",
+                                                "type": "RECORD",
+                                                "mode": "NULLABLE",
+                                                "fields": [
+                                                    {
+                                                        "name": "target",
+                                                        "type": "RECORD",
+                                                        "mode": "NULLABLE",
+                                                        "fields": [
+                                                            {
+                                                                "name": "root",
+                                                                "type": "STRING",
+                                                                "mode": "NULLABLE"
+                                                            },
+                                                            {
+                                                                "name": "epoch",
+                                                                "type": "INTEGER",
+                                                                "mode": "NULLABLE"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "beacon_block_root",
+                                                        "type": "STRING",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "source",
+                                                        "type": "RECORD",
+                                                        "mode": "NULLABLE",
+                                                        "fields": [
+                                                            {
+                                                                "name": "root",
+                                                                "type": "STRING",
+                                                                "mode": "NULLABLE"
+                                                            },
+                                                            {
+                                                                "name": "epoch",
+                                                                "type": "INTEGER",
+                                                                "mode": "NULLABLE"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "index",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    },
+                                                    {
+                                                        "name": "slot",
+                                                        "type": "INTEGER",
+                                                        "mode": "NULLABLE"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "attesting_indices",
+                                                "type": "INTEGER",
+                                                "mode": "REPEATED"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "deposits",
+                                "type": "RECORD",
+                                "mode": "REPEATED",
+                                "fields": [
+                                    {
+                                        "name": "data",
+                                        "type": "RECORD",
+                                        "mode": "NULLABLE",
+                                        "fields": [
+                                            {
+                                                "name": "signature",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "amount",
+                                                "type": "INTEGER",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "withdrawal_credentials",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            },
+                                            {
+                                                "name": "pubkey",
+                                                "type": "STRING",
+                                                "mode": "NULLABLE"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "proof",
+                                        "type": "STRING",
+                                        "mode": "REPEATED"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "graffiti",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "randao_reveal",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "parent_root",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "slot",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    }
+                ]
+            }
+        ]
     },
     {
-        "name": "operations_hash",
+        "name": "root",
         "type": "STRING",
-        "description": "The hash of a list of root hashes of Merkle trees of operations. There is one list of operations per validation pass",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "fitness",
-        "type": "STRING",
-        "description": "A sequence of sequences of unsigned bytes, ordered by length and then lexicographically. It represents the claimed fitness of the chain ending in this block",
-        "mode": "REPEATED"
-    },
-    {
-        "name": "context",
-        "type": "STRING",
-        "description": "Hash of context (Base58Check-encoded)",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "protocol",
-        "type": "STRING",
-        "description": "Protocol version",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "chain_id",
-        "type": "STRING",
-        "description": "Network identifier (Base58Check-encoded)",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "block_hash",
-        "type": "STRING",
-        "description": "Block identifier (Base58Check-encoded)",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "nonce_hash",
-        "type": "STRING",
-        "description": "A commitment to a random number, used to generate entropy on the chain"
-    },
-    {
-        "name": "consumed_gas",
-        "type": "INTEGER",
-        "description": "Gas consumed in a block"
-    },
-    {
-        "name": "baker",
-        "type": "STRING",
-        "description": "Public key hash of block baker (Base58Check-encoded)"
-    },
-    {
-        "name": "voting_period_kind",
-        "type": "STRING",
-        "description": "The kind of the voting period"
-    },
-    {
-        "name": "cycle",
-        "type": "INTEGER",
-        "description": "Block cycle"
-    },
-    {
-        "name": "cycle_position",
-        "type": "INTEGER",
-        "description": "Cycle position"
-    },
-    {
-        "name": "voting_period",
-        "type": "INTEGER",
-        "description": "Voting period"
-    },
-    {
-        "name": "voting_period_position",
-        "type": "INTEGER",
-        "description": "Voting period position"
-    },
-    {
-        "name": "expected_commitment",
-        "type": "BOOLEAN",
-        "description": "Expected commitment"
-    },
-    {
-        "name": "number_of_operation_groups",
-        "type": "INTEGER",
-        "description": "The number of operation groups in a block",
-        "mode": "REQUIRED"
-    },
-    {
-        "name": "number_of_operations",
-        "type": "INTEGER",
-        "description": "The number of operations in a block",
-        "mode": "REQUIRED"
+        "mode": "NULLABLE"
     }
 ]
