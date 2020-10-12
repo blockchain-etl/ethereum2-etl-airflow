@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from tempfile import TemporaryDirectory
 
 from airflow import DAG, configuration
@@ -10,8 +10,10 @@ from airflow.operators import python_operator
 
 from ethereum2etl.cli import (
     get_block_range_for_date,
+    get_epoch_range_for_date,
     export_beacon_blocks,
-)
+    export_beacon_validators, export_beacon_committees)
+from ethereum2etl.utils.ethereum2_utils import compute_epoch_at_timestamp
 
 from ethereum2etl_airflow.gcs_utils import upload_to_gcs
 
@@ -21,6 +23,7 @@ def build_export_dag(
         provider_uris,
         output_bucket,
         export_start_date,
+        export_rate_limit=None,
         export_end_date=None,
         notification_emails=None,
         export_schedule_interval='0 0 * * *',
@@ -48,7 +51,8 @@ def build_export_dag(
         dag_id,
         schedule_interval=export_schedule_interval,
         default_args=default_dag_args,
-        max_active_runs=export_max_active_runs
+        max_active_runs=export_max_active_runs,
+        concurrency=1,
     )
 
     from airflow.contrib.hooks.gcs_hook import GoogleCloudStorageHook
@@ -72,14 +76,23 @@ def build_export_dag(
 
     def get_block_range(tempdir, date):
         logging.info('Calling get_block_range_for_date({}, ...)'.format(date))
-        get_block_range_for_date.callback(date=date, output=os.path.join(tempdir, "blocks_meta.txt")
-        )
+        get_block_range_for_date.callback(date=date, output=os.path.join(tempdir, "blocks_meta.txt"))
 
         with open(os.path.join(tempdir, "blocks_meta.txt")) as block_range_file:
             block_range = block_range_file.read()
             start_block, end_block = block_range.split(",")
 
         return int(start_block), int(end_block)
+
+    def get_epoch_range(tempdir, date):
+        logging.info('Calling get_epoch_range_for_date({}, ...)'.format(date))
+        get_epoch_range_for_date.callback(date=date, output=os.path.join(tempdir, "epochs_meta.txt"))
+
+        with open(os.path.join(tempdir, "epochs_meta.txt")) as epoch_range_file:
+            epoch_range = epoch_range_file.read()
+            start_epoch, end_epoch = epoch_range.split(",")
+
+        return int(start_epoch), int(end_epoch)
 
     def export_beacon_blocks_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
@@ -92,6 +105,7 @@ def build_export_dag(
                 start_block=start_block,
                 end_block=end_block,
                 provider_uri=provider_uri,
+                rate_limit=export_rate_limit,
                 max_workers=export_max_workers,
                 output_dir=tempdir,
                 output_format='json'
@@ -103,6 +117,47 @@ def build_export_dag(
 
             copy_to_export_path(
                 os.path.join(tempdir, "beacon_blocks.json"), export_path("beacon_blocks", execution_date)
+            )
+
+    def export_beacon_validators_command(execution_date, provider_uri, **kwargs):
+        with TemporaryDirectory() as tempdir:
+            epoch = get_last_epoch(execution_date)
+
+            logging.info('Calling export_beacon_validators({}, {}, {}, {})'.format(
+                epoch, provider_uri, export_max_workers, tempdir))
+
+            export_beacon_validators.callback(
+                epoch=epoch,
+                provider_uri=provider_uri,
+                rate_limit=export_rate_limit,
+                max_workers=export_max_workers,
+                output_dir=tempdir,
+                output_format='json'
+            )
+
+            copy_to_export_path(
+                os.path.join(tempdir, "beacon_validators.json"), export_path("beacon_validators", execution_date)
+            )
+
+    def export_beacon_committees_command(execution_date, provider_uri, **kwargs):
+        with TemporaryDirectory() as tempdir:
+            start_epoch, end_epoch = get_epoch_range(tempdir, execution_date)
+
+            logging.info('Calling export_beacon_committees({}, {}, {}, {})'.format(
+                start_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
+
+            export_beacon_committees.callback(
+                start_epoch=start_epoch,
+                end_epoch=end_epoch,
+                provider_uri=provider_uri,
+                rate_limit=export_rate_limit,
+                max_workers=export_max_workers,
+                output_dir=tempdir,
+                output_format='json'
+            )
+
+            copy_to_export_path(
+                os.path.join(tempdir, "beacon_committees.json"), export_path("beacon_committees", execution_date)
             )
 
     def add_export_task(toggle, task_id, python_callable, dependencies=None):
@@ -130,6 +185,18 @@ def build_export_dag(
         add_provider_uri_fallback_loop(export_beacon_blocks_command, provider_uris),
     )
 
+    # add_export_task(
+    #     True,
+    #     "export_beacon_validators",
+    #     add_provider_uri_fallback_loop(export_beacon_validators_command, provider_uris),
+    # )
+
+    # add_export_task(
+    #     True,
+    #     "export_beacon_committees",
+    #     add_provider_uri_fallback_loop(export_beacon_committees_command, provider_uris),
+    # )
+
     return dag
 
 
@@ -148,3 +215,9 @@ def add_provider_uri_fallback_loop(python_callable, provider_uris):
                     raise e
 
     return python_callable_with_fallback
+
+
+def get_last_epoch(execution_date):
+    ts = datetime.combine(execution_date, datetime.max.time().replace(tzinfo=timezone.utc))
+    epoch = compute_epoch_at_timestamp(ts)
+    return epoch

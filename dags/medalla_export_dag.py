@@ -11,6 +11,6 @@ DAG = build_export_dag(
         export_schedule_interval='0 1 * * *',
         export_start_date='2020-08-04',
         export_max_active_runs=1,
-        export_max_workers=1,
+        export_max_workers=5,
     )
 )

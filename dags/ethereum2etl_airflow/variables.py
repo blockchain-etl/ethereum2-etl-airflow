@@ -17,6 +17,9 @@ def read_export_dag_vars(var_prefix, **kwargs):
     export_max_active_runs = read_var('export_max_active_runs', var_prefix, False, **kwargs)
     export_max_active_runs = int(export_max_active_runs) if export_max_active_runs is not None else None
 
+    export_rate_limit = read_var('export_rate_limit', var_prefix, False, **kwargs)
+    export_rate_limit = int(export_rate_limit) if export_rate_limit is not None else None
+
     vars = {
         'output_bucket': read_var('output_bucket', var_prefix, True, **kwargs),
         'export_start_date': export_start_date,
@@ -26,6 +29,7 @@ def read_export_dag_vars(var_prefix, **kwargs):
         'notification_emails': read_var('notification_emails', None, False, **kwargs),
         'export_max_active_runs': export_max_active_runs,
         'export_max_workers': int(read_var('export_max_workers', var_prefix, True, **kwargs)),
+        'export_rate_limit': export_rate_limit,
     }
 
     return vars
