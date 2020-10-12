@@ -1,6 +1,6 @@
 SELECT IF(
 (
-    SELECT MAX(level)
+    SELECT MAX(block_slot)
     FROM `{{params.destination_dataset_project_id}}.{{params.dataset_name}}.beacon_blocks`
     WHERE DATE(block_timestamp) <= '{{ds}}'
 ) + 1 =
