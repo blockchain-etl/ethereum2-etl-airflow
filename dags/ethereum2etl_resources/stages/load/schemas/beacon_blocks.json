@@ -1,11 +1,11 @@
 [
     {
-        "name": "slot",
+        "name": "block_slot",
         "type": "INTEGER",
         "mode": "NULLABLE"
     },
     {
-        "name": "epoch",
+        "name": "block_epoch",
         "type": "INTEGER",
         "mode": "NULLABLE"
     },
@@ -61,7 +61,7 @@
     },
     {
         "name": "eth1_deposit_count",
-        "type": "STRING",
+        "type": "INTEGER",
         "mode": "NULLABLE"
     },
     {

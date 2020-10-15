@@ -185,17 +185,17 @@ def build_export_dag(
         add_provider_uri_fallback_loop(export_beacon_blocks_command, provider_uris),
     )
 
-    # add_export_task(
-    #     True,
-    #     "export_beacon_validators",
-    #     add_provider_uri_fallback_loop(export_beacon_validators_command, provider_uris),
-    # )
+    add_export_task(
+        True,
+        "export_beacon_validators",
+        add_provider_uri_fallback_loop(export_beacon_validators_command, provider_uris),
+    )
 
-    # add_export_task(
-    #     True,
-    #     "export_beacon_committees",
-    #     add_provider_uri_fallback_loop(export_beacon_committees_command, provider_uris),
-    # )
+    add_export_task(
+        True,
+        "export_beacon_committees",
+        add_provider_uri_fallback_loop(export_beacon_committees_command, provider_uris),
+    )
 
     return dag
 

@@ -73,7 +73,7 @@ def build_load_dag(
             dag=dag
         )
 
-        def load_task(execution_date, **kwargs):
+        def load_task(ds, **kwargs):
             client = bigquery.Client()
             job_config = bigquery.LoadJobConfig()
             schema_path = os.path.join(dags_folder, 'ethereum2etl_resources/stages/load/schemas/{task}.json'.format(task=task))
@@ -86,8 +86,8 @@ def build_load_dag(
 
             export_location_uri = 'gs://{bucket}/export'.format(bucket=output_bucket)
             if only_last_date:
-                uri = '{export_location_uri}/{task}/block_date={execution_date}/*.json'.format(
-                    export_location_uri=export_location_uri, task=task, execution_date=execution_date)
+                uri = '{export_location_uri}/{task}/block_date={ds}/*.json'.format(
+                    export_location_uri=export_location_uri, task=task, ds=ds)
             else:
                 uri = '{export_location_uri}/{task}/*.json'.format(export_location_uri=export_location_uri, task=task)
             table_ref = create_dataset(client, dataset_name, destination_dataset_project_id).table(task)
@@ -129,6 +129,7 @@ def build_load_dag(
 
     verify_blocks_count_task = add_verify_tasks('blocks_count', dependencies=[load_beacon_blocks_task])
     verify_blocks_have_latest_task = add_verify_tasks('blocks_have_latest', dependencies=[load_beacon_blocks_task])
+    verify_committees_count_task = add_verify_tasks('committees_count', dependencies=[load_beacon_committees_task])
 
     if notification_emails and len(notification_emails) > 0:
         send_email_task = EmailOperator(
@@ -140,5 +141,6 @@ def build_load_dag(
         )
         verify_blocks_count_task >> send_email_task
         verify_blocks_have_latest_task >> send_email_task
+        verify_committees_count_task >> send_email_task
 
     return dag

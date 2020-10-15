@@ -1,7 +1,7 @@
 # Ethereum 2.0 ETL Airflow
 
 Airflow DAGs for exporting and loading the Ethereum 2.0 blockchain data to Google BigQuery.
-Data is available for you to query right away in [Google BigQuery](https://console.cloud.google.com/bigquery?page=dataset&d=crypto_ethereum2&p=public-data-finance).
+Data is available for you to query right away in [Google BigQuery](https://console.cloud.google.com/bigquery?page=dataset&d=crypto_ethereum2_medalla&p=public-data-finance).
 
 ## Prerequisites
 
