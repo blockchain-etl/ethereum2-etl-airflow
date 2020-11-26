@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import logging
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from tempfile import TemporaryDirectory
 
 from airflow import DAG, configuration
@@ -13,7 +13,6 @@ from ethereum2etl.cli import (
     get_epoch_range_for_date,
     export_beacon_blocks,
     export_beacon_validators, export_beacon_committees)
-from ethereum2etl.utils.ethereum2_utils import compute_epoch_at_timestamp
 
 from ethereum2etl_airflow.gcs_utils import upload_to_gcs
 
@@ -74,9 +73,13 @@ def build_export_dag(
             object=export_path + filename,
             filename=file_path)
 
-    def get_block_range(tempdir, date):
-        logging.info('Calling get_block_range_for_date({}, ...)'.format(date))
-        get_block_range_for_date.callback(date=date, output=os.path.join(tempdir, "blocks_meta.txt"))
+    def get_block_range(tempdir, date, provider_uri):
+        logging.info('Calling get_block_range_for_date({},{}, ...)'.format(date, provider_uri))
+        get_block_range_for_date.callback(
+            date=date,
+            output=os.path.join(tempdir, "blocks_meta.txt"),
+            provider_uri=provider_uri,
+            rate_limit=export_rate_limit)
 
         with open(os.path.join(tempdir, "blocks_meta.txt")) as block_range_file:
             block_range = block_range_file.read()
@@ -84,9 +87,13 @@ def build_export_dag(
 
         return int(start_block), int(end_block)
 
-    def get_epoch_range(tempdir, date):
-        logging.info('Calling get_epoch_range_for_date({}, ...)'.format(date))
-        get_epoch_range_for_date.callback(date=date, output=os.path.join(tempdir, "epochs_meta.txt"))
+    def get_epoch_range(tempdir, date, provider_uri):
+        logging.info('Calling get_epoch_range_for_date({},{}, ...)'.format(date, provider_uri))
+        get_epoch_range_for_date.callback(
+            date=date,
+            output=os.path.join(tempdir, "epochs_meta.txt"),
+            provider_uri=provider_uri,
+            rate_limit=export_rate_limit)
 
         with open(os.path.join(tempdir, "epochs_meta.txt")) as epoch_range_file:
             epoch_range = epoch_range_file.read()
@@ -96,7 +103,7 @@ def build_export_dag(
 
     def export_beacon_blocks_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
-            start_block, end_block = get_block_range(tempdir, execution_date)
+            start_block, end_block = get_block_range(tempdir, execution_date, provider_uri)
 
             logging.info('Calling export_beacon_blocks({}, {}, {}, {}, {})'.format(
                 start_block, end_block, provider_uri, export_max_workers, tempdir))
@@ -121,13 +128,11 @@ def build_export_dag(
 
     def export_beacon_validators_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
-            epoch = get_last_epoch(execution_date)
 
-            logging.info('Calling export_beacon_validators({}, {}, {}, {})'.format(
-                epoch, provider_uri, export_max_workers, tempdir))
+            logging.info('Calling export_beacon_validators({}, {}, {})'.format(
+                provider_uri, export_max_workers, tempdir))
 
             export_beacon_validators.callback(
-                epoch=epoch,
                 provider_uri=provider_uri,
                 rate_limit=export_rate_limit,
                 max_workers=export_max_workers,
@@ -141,7 +146,7 @@ def build_export_dag(
 
     def export_beacon_committees_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
-            start_epoch, end_epoch = get_epoch_range(tempdir, execution_date)
+            start_epoch, end_epoch = get_epoch_range(tempdir, execution_date, provider_uri)
 
             logging.info('Calling export_beacon_committees({}, {}, {}, {})'.format(
                 start_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
@@ -215,9 +220,3 @@ def add_provider_uri_fallback_loop(python_callable, provider_uris):
                     raise e
 
     return python_callable_with_fallback
-
-
-def get_last_epoch(execution_date):
-    ts = datetime.combine(execution_date, datetime.max.time().replace(tzinfo=timezone.utc))
-    epoch = compute_epoch_at_timestamp(ts)
-    return epoch

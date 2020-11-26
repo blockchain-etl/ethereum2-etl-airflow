@@ -14,6 +14,6 @@ DAG = build_load_dag(
     chain='ethereum2_medalla',
     **read_load_dag_vars(
         var_prefix='medalla_',
-        load_schedule_interval='0 2 * * *'
+        load_schedule_interval='0 3 * * *'
     )
 )

@@ -48,5 +48,10 @@
         "name": "withdrawable_epoch",
         "type": "STRING",
         "mode": "NULLABLE"
+    },
+    {
+        "name": "status",
+        "type": "STRING",
+        "mode": "NULLABLE"
     }
 ]
