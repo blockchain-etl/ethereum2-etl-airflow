@@ -5,7 +5,7 @@ from ethereum2etl_airflow.variables import read_export_dag_vars
 
 # airflow DAG
 DAG = build_export_dag(
-    dag_id='medalla_export_dag',
+    dag_id='eth2_mainnet_export_dag',
     **read_export_dag_vars(
         var_prefix='eth2_mainnet_',
         export_schedule_interval='0 1 * * *',
