@@ -133,6 +133,8 @@ def build_export_dag(
                 provider_uri, export_max_workers, tempdir))
 
             export_beacon_validators.callback(
+                start_epoch=None,
+                end_epoch=None,
                 provider_uri=provider_uri,
                 rate_limit=export_rate_limit,
                 max_workers=export_max_workers,

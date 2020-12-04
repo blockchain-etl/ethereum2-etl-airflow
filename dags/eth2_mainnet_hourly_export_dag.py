@@ -1,11 +1,11 @@
 from __future__ import print_function
 
-from ethereum2etl_airflow.build_hourly_export_dag_custom import build_hourly_export_dag_custom
+from ethereum2etl_airflow.build_hourly_export_dag import build_hourly_export_dag
 from ethereum2etl_airflow.variables import read_export_dag_vars
 
 # airflow DAG
-DAG = build_hourly_export_dag_custom(
-    dag_id='eth2_mainnet_hourly_export_dag_custom',
+DAG = build_hourly_export_dag(
+    dag_id='eth2_mainnet_hourly_export_dag',
     **read_export_dag_vars(
         var_prefix='eth2_mainnet_',
         export_schedule_interval='30 * * * *',

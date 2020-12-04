@@ -19,7 +19,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-def build_hourly_load_dag_custom(
+def build_hourly_load_dag(
         dag_id,
         output_bucket,
         destination_dataset_project_id,
@@ -64,24 +64,23 @@ def build_hourly_load_dag_custom(
     dags_folder = os.environ.get('DAGS_FOLDER', '/home/airflow/gcs/dags')
 
     def add_load_tasks(task, time_partitioning_field='block_timestamp', only_last_date=False):
+        normalized_task = task
+        if task == 'beacon_validators_with_timestamp':
+            normalized_task = 'beacon_validators'
+
         wait_sensor = GoogleCloudStorageObjectSensor(
             task_id='wait_latest_{task}'.format(task=task),
             timeout=60 * 60,
             poke_interval=60,
             bucket=output_bucket,
-            object='export_hourly/{task}/block_date={datestamp}/{{{{execution_date.strftime("%H")}}}}/{task}.json'.format(task=task, datestamp='{{ds}}'),
+            object='export_hourly/{task}/block_date={datestamp}/{{{{execution_date.strftime("%H")}}}}/{task}.json'.format(task=normalized_task, datestamp='{{ds}}'),
             dag=dag
         )
 
         def load_task(ds, **kwargs):
             client = bigquery.Client()
             job_config = bigquery.LoadJobConfig()
-            
-            if task != 'beacon_validators':
-                schema_path = os.path.join(dags_folder, 'ethereum2etl_resources/stages/load/schemas/{task}.json'.format(task=task))
-            else:
-                schema_path = os.path.join(dags_folder,
-                                           'ethereum2etl_resources/stages/load/schemas/beacon_validators_with_timestamp.json'.format(task=task))
+            schema_path = os.path.join(dags_folder, 'ethereum2etl_resources/stages/load/schemas/{task}.json'.format(task=task))
             job_config.schema = read_bigquery_schema_from_file(schema_path)
             job_config.source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
             job_config.write_disposition = 'WRITE_TRUNCATE'
@@ -91,16 +90,11 @@ def build_hourly_load_dag_custom(
 
             export_location_uri = 'gs://{bucket}/export_hourly'.format(bucket=output_bucket)
             if only_last_date:
-                uri = '{export_location_uri}/{task}/block_date=20*.json'.format(
-                    export_location_uri=export_location_uri, task=task, ds=ds)
+                uri = '{export_location_uri}/{task}/block_date=latest/*.json'\
+                    .format(export_location_uri=export_location_uri, task=normalized_task, ds=ds)
             else:
-                uri = '{export_location_uri}/{task}/*.json'.format(export_location_uri=export_location_uri, task=task)
-
-            if task != 'beacon_validators':
-                table_ref = create_dataset(client, dataset_name, destination_dataset_project_id).table(task)
-            else:
-                table_ref = create_dataset(client, dataset_name, destination_dataset_project_id).table('beacon_validators_with_timestamp')
-
+                uri = '{export_location_uri}/{task}/block_date=20*.json'.format(export_location_uri=export_location_uri, task=normalized_task)
+            table_ref = create_dataset(client, dataset_name, destination_dataset_project_id).table(task)
             load_job = client.load_table_from_uri(uri, table_ref, job_config=job_config)
             submit_bigquery_job(load_job, job_config)
             assert load_job.state == 'DONE'
@@ -134,7 +128,8 @@ def build_hourly_load_dag_custom(
         return verify_task
 
     load_beacon_blocks_task = add_load_tasks('beacon_blocks', time_partitioning_field='block_timestamp')
-    load_beacon_validators_task = add_load_tasks('beacon_validators', time_partitioning_field='timestamp', only_last_date=True)
+    load_beacon_validators_task = add_load_tasks('beacon_validators', time_partitioning_field=None, only_last_date=True)
+    load_beacon_validators_with_timestamp_task = add_load_tasks('beacon_validators_with_timestamp', time_partitioning_field='timestamp')
     load_beacon_committees_task = add_load_tasks('beacon_committees', time_partitioning_field='epoch_timestamp')
 
     verify_blocks_count_task = add_verify_tasks('blocks_count', dependencies=[load_beacon_blocks_task])

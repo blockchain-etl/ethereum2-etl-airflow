@@ -19,7 +19,7 @@ from ethereum2etl.service.ethereum2_service import Ethereum2Service
 from ethereum2etl_airflow.gcs_utils import upload_to_gcs
 
 
-def build_hourly_export_dag_custom(
+def build_hourly_export_dag(
         dag_id,
         provider_uris,
         output_bucket,
@@ -82,7 +82,6 @@ def build_hourly_export_dag_custom(
 
 
     def export_beacon_blocks_command(execution_date, provider_uri, **kwargs):
-        execution_date = datetime(year=2020, month=12, day=1, hour=12)
         with TemporaryDirectory() as tempdir:
             start_block, end_block = get_block_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
@@ -104,14 +103,14 @@ def build_hourly_export_dag_custom(
             )
 
     def export_beacon_validators_command(execution_date, provider_uri, **kwargs):
-        execution_date = datetime(year=2020, month=12, day=1, hour=12)
         with TemporaryDirectory() as tempdir:
 
             logging.info('Calling export_beacon_validators({}, {}, {})'.format(
                 provider_uri, export_max_workers, tempdir))
 
             export_beacon_validators.callback(
-                epoch=0,
+                start_epoch=None,
+                end_epoch=None,
                 provider_uri=provider_uri,
                 rate_limit=export_rate_limit,
                 max_workers=export_max_workers,
@@ -128,7 +127,6 @@ def build_hourly_export_dag_custom(
             )
 
     def export_beacon_committees_command(execution_date, provider_uri, **kwargs):
-        execution_date = datetime(year=2020, month=12, day=1, hour=12)
         with TemporaryDirectory() as tempdir:
             start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
