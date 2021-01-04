@@ -1,5 +1,15 @@
 [
     {
+        "name": "epoch",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE"
+    },
+    {
         "name": "pubkey",
         "type": "STRING",
         "mode": "NULLABLE"

@@ -9,6 +9,7 @@ from airflow.contrib.operators.bigquery_operator import BigQueryOperator
 from airflow.contrib.sensors.gcs_sensor import GoogleCloudStorageObjectSensor
 from airflow.operators.email_operator import EmailOperator
 from airflow.operators.python_operator import PythonOperator
+from airflow.operators.sensors import ExternalTaskSensor
 from google.cloud import bigquery
 from google.cloud.bigquery import TimePartitioning
 
@@ -63,24 +64,35 @@ def build_hourly_load_dag(
 
     dags_folder = os.environ.get('DAGS_FOLDER', '/home/airflow/gcs/dags')
 
-    def add_load_tasks(task, time_partitioning_field='block_timestamp', only_last_date=False):
-        normalized_task = task
-        if task == 'beacon_validators_with_timestamp':
-            normalized_task = 'beacon_validators'
-
-        wait_sensor = GoogleCloudStorageObjectSensor(
-            task_id='wait_latest_{task}'.format(task=task),
-            timeout=60 * 60,
-            poke_interval=60,
-            bucket=output_bucket,
-            object='export_hourly/{task}/block_date={datestamp}/{{{{execution_date.strftime("%H")}}}}/{task}.json'.format(task=normalized_task, datestamp='{{ds}}'),
-            dag=dag
-        )
+    def add_load_tasks(task, time_partitioning_field='block_timestamp', wait_load_task=None, file_name=None):
+        if file_name is None:
+            file_name = task
+        if wait_load_task is not None:
+            wait_sensor = ExternalTaskSensor(
+                task_id='wait_latest_{task}'.format(task=task),
+                external_dag_id='eth2_mainnet_hourly_export_dag',
+                external_task_id=wait_load_task,
+                execution_delta=timedelta(minutes=0),
+                priority_weight=0,
+                mode='reschedule',
+                poke_interval=5 * 60,
+                timeout=60 * 60 * 2,
+                dag=dag)
+        else:
+            wait_sensor = GoogleCloudStorageObjectSensor(
+                task_id='wait_latest_{task}'.format(task=task),
+                timeout=60 * 60,
+                poke_interval=60,
+                bucket=output_bucket,
+                object='export_hourly/{task}/block_date={datestamp}/{{{{execution_date.strftime("%H")}}}}/{file_name}.json'
+                    .format(task=task, datestamp='{{ds}}', file_name=file_name),
+                dag=dag
+            )
 
         def load_task(ds, **kwargs):
             client = bigquery.Client()
             job_config = bigquery.LoadJobConfig()
-            schema_path = os.path.join(dags_folder, 'ethereum2etl_resources/stages/load/schemas/{task}.json'.format(task=task))
+            schema_path = os.path.join(dags_folder, 'ethereum2etl_resources/stages/load/schemas/{file_name}.json'.format(file_name=file_name))
             job_config.schema = read_bigquery_schema_from_file(schema_path)
             job_config.source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
             job_config.write_disposition = 'WRITE_TRUNCATE'
@@ -89,11 +101,7 @@ def build_hourly_load_dag(
                 job_config.time_partitioning = TimePartitioning(field=time_partitioning_field)
 
             export_location_uri = 'gs://{bucket}/export_hourly'.format(bucket=output_bucket)
-            if only_last_date:
-                uri = '{export_location_uri}/{task}/block_date=latest/*.json'\
-                    .format(export_location_uri=export_location_uri, task=normalized_task, ds=ds)
-            else:
-                uri = '{export_location_uri}/{task}/block_date=20*.json'.format(export_location_uri=export_location_uri, task=normalized_task)
+            uri = '{export_location_uri}/{task}/*.json'.format(export_location_uri=export_location_uri, task=task)
             table_ref = create_dataset(client, dataset_name, destination_dataset_project_id).table(task)
             load_job = client.load_table_from_uri(uri, table_ref, job_config=job_config)
             submit_bigquery_job(load_job, job_config)
@@ -128,24 +136,21 @@ def build_hourly_load_dag(
         return verify_task
 
     load_beacon_blocks_task = add_load_tasks('beacon_blocks', time_partitioning_field='block_timestamp')
-    load_beacon_validators_task = add_load_tasks('beacon_validators', time_partitioning_field=None, only_last_date=True)
-    load_beacon_validators_with_timestamp_task = add_load_tasks('beacon_validators_with_timestamp', time_partitioning_field='timestamp')
+    load_beacon_validators_task = add_load_tasks('beacon_validators', time_partitioning_field='timestamp')
+    load_beacon_validators_hourly_task = add_load_tasks(
+        'beacon_validators_hourly',
+        time_partitioning_field='timestamp',
+        file_name='beacon_validators')
+    load_beacon_validators_latest_task = add_load_tasks(
+        'beacon_validators_latest',
+        time_partitioning_field='timestamp',
+        wait_load_task='export_beacon_validators_hourly',
+        file_name='beacon_validators')
     load_beacon_committees_task = add_load_tasks('beacon_committees', time_partitioning_field='epoch_timestamp')
 
     verify_blocks_count_task = add_verify_tasks('blocks_count', dependencies=[load_beacon_blocks_task])
     verify_blocks_have_latest_task = add_verify_tasks('blocks_have_latest', dependencies=[load_beacon_blocks_task])
+    # verify_validators_count_task = add_verify_tasks('validators_count', dependencies=[load_beacon_validators_task])
     verify_committees_count_task = add_verify_tasks('committees_count', dependencies=[load_beacon_committees_task])
-
-    if notification_emails and len(notification_emails) > 0:
-        send_email_task = EmailOperator(
-            task_id='send_email',
-            to=[email.strip() for email in notification_emails.split(',')],
-            subject='Ethereum2 ETL Airflow Load DAG Succeeded',
-            html_content='Ethereum2 ETL Airflow Load DAG Succeeded - {}'.format(chain),
-            dag=dag
-        )
-        verify_blocks_count_task >> send_email_task
-        verify_blocks_have_latest_task >> send_email_task
-        verify_committees_count_task >> send_email_task
 
     return dag

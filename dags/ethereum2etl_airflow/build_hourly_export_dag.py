@@ -104,13 +104,14 @@ def build_hourly_export_dag(
 
     def export_beacon_validators_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
+            start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
-            logging.info('Calling export_beacon_validators({}, {}, {})'.format(
-                provider_uri, export_max_workers, tempdir))
+            logging.info('Calling export_beacon_validators({}, {}, {}, {}, {})'.format(
+                start_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
 
             export_beacon_validators.callback(
-                start_epoch=None,
-                end_epoch=None,
+                start_epoch=start_epoch,
+                end_epoch=end_epoch,
                 provider_uri=provider_uri,
                 rate_limit=export_rate_limit,
                 max_workers=export_max_workers,
@@ -122,8 +123,29 @@ def build_hourly_export_dag(
                 os.path.join(tempdir, "beacon_validators.json"), export_path("beacon_validators", execution_date)
             )
 
+    def export_beacon_validators_hourly_command(execution_date, provider_uri, **kwargs):
+        with TemporaryDirectory() as tempdir:
+            start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
+
+            logging.info('Calling export_beacon_validators({}, {}, {}, {}, {})'.format(
+                end_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
+
+            export_beacon_validators.callback(
+                start_epoch=end_epoch,
+                end_epoch=end_epoch,
+                provider_uri=provider_uri,
+                rate_limit=export_rate_limit,
+                max_workers=export_max_workers,
+                output_dir=tempdir,
+                output_format='json'
+            )
+
             copy_to_export_path(
-                os.path.join(tempdir, "beacon_validators.json"), export_path_for_tag("beacon_validators", "latest")
+                os.path.join(tempdir, "beacon_validators.json"), export_path("beacon_validators_hourly", execution_date)
+            )
+
+            copy_to_export_path(
+                os.path.join(tempdir, "beacon_validators.json"), export_path_for_tag("beacon_validators_latest", "latest")
             )
 
     def export_beacon_committees_command(execution_date, provider_uri, **kwargs):
@@ -176,6 +198,12 @@ def build_hourly_export_dag(
         True,
         "export_beacon_validators",
         add_provider_uri_fallback_loop(export_beacon_validators_command, provider_uris),
+    )
+
+    add_export_task(
+        True,
+        "export_beacon_validators_hourly",
+        add_provider_uri_fallback_loop(export_beacon_validators_hourly_command, provider_uris),
     )
 
     add_export_task(
