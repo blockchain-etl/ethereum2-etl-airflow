@@ -42,7 +42,7 @@ def build_hourly_load_dag(
         'start_date': load_start_date,
         'end_date': load_end_date,
         'email_on_failure': True,
-        'email_on_retry': True,
+        'email_on_retry': False,
         'retries': 5,
         'retry_delay': timedelta(minutes=5)
     }

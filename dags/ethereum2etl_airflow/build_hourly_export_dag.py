@@ -37,7 +37,7 @@ def build_hourly_export_dag(
         "start_date": export_start_date,
         "end_date": export_end_date,
         "email_on_failure": True,
-        "email_on_retry": True,
+        "email_on_retry": False,
         "retries": 5,
         "retry_delay": timedelta(minutes=5)
     }
