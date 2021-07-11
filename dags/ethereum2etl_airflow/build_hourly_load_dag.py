@@ -151,6 +151,6 @@ def build_hourly_load_dag(
     verify_blocks_count_task = add_verify_tasks('blocks_count', dependencies=[load_beacon_blocks_task])
     verify_blocks_have_latest_task = add_verify_tasks('blocks_have_latest', dependencies=[load_beacon_blocks_task])
     # verify_validators_count_task = add_verify_tasks('validators_count', dependencies=[load_beacon_validators_task])
-    verify_committees_count_task = add_verify_tasks('committees_count', dependencies=[load_beacon_committees_task])
+    # verify_committees_count_task = add_verify_tasks('committees_count', dependencies=[load_beacon_committees_task])
 
     return dag
