@@ -2,22 +2,24 @@ from __future__ import print_function
 
 import os
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from tempfile import TemporaryDirectory
 
 from airflow import DAG, configuration
 from airflow.operators import python_operator
+from ethereum2etl.api.build_api import build_api
 
 from ethereum2etl.cli import (
-    get_block_range_for_date,
-    get_epoch_range_for_date,
     export_beacon_blocks,
     export_beacon_validators, export_beacon_committees)
+from ethereum2etl.service.ethereum2_block_range_service import Ethereum2BlockRangeService
+from ethereum2etl.service.ethereum2_epoch_range_service import Ethereum2EpochRangeService
+from ethereum2etl.service.ethereum2_service import Ethereum2Service
 
 from ethereum2etl_airflow.gcs_utils import upload_to_gcs
 
 
-def build_export_dag(
+def build_hourly_export_dag(
         dag_id,
         provider_uris,
         output_bucket,
@@ -35,7 +37,7 @@ def build_export_dag(
         "start_date": export_start_date,
         "end_date": export_end_date,
         "email_on_failure": True,
-        "email_on_retry": True,
+        "email_on_retry": False,
         "retries": 5,
         "retry_delay": timedelta(minutes=5)
     }
@@ -59,8 +61,13 @@ def build_export_dag(
 
     # Export
     def export_path(directory, date):
-        return "export/{directory}/block_date={block_date}/".format(
-            directory=directory, block_date=date.strftime("%Y-%m-%d")
+        return "export_hourly/{directory}/block_date={block_date}/{hour}/".format(
+            directory=directory, block_date=date.strftime("%Y-%m-%d"), hour=date.strftime("%H")
+        )
+
+    def export_path_for_tag(directory, tag):
+        return "export_hourly/{directory}/block_date={block_date}/".format(
+            directory=directory, block_date=tag
         )
 
     def copy_to_export_path(file_path, export_path):
@@ -73,37 +80,10 @@ def build_export_dag(
             object=export_path + filename,
             filename=file_path)
 
-    def get_block_range(tempdir, date, provider_uri):
-        logging.info('Calling get_block_range_for_date({},{}, ...)'.format(date, provider_uri))
-        get_block_range_for_date.callback(
-            date=date,
-            output=os.path.join(tempdir, "blocks_meta.txt"),
-            provider_uri=provider_uri,
-            rate_limit=export_rate_limit)
-
-        with open(os.path.join(tempdir, "blocks_meta.txt")) as block_range_file:
-            block_range = block_range_file.read()
-            start_block, end_block = block_range.split(",")
-
-        return int(start_block), int(end_block)
-
-    def get_epoch_range(tempdir, date, provider_uri):
-        logging.info('Calling get_epoch_range_for_date({},{}, ...)'.format(date, provider_uri))
-        get_epoch_range_for_date.callback(
-            date=date,
-            output=os.path.join(tempdir, "epochs_meta.txt"),
-            provider_uri=provider_uri,
-            rate_limit=export_rate_limit)
-
-        with open(os.path.join(tempdir, "epochs_meta.txt")) as epoch_range_file:
-            epoch_range = epoch_range_file.read()
-            start_epoch, end_epoch = epoch_range.split(",")
-
-        return int(start_epoch), int(end_epoch)
 
     def export_beacon_blocks_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
-            start_block, end_block = get_block_range(tempdir, execution_date, provider_uri)
+            start_block, end_block = get_block_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
             logging.info('Calling export_beacon_blocks({}, {}, {}, {}, {})'.format(
                 start_block, end_block, provider_uri, export_max_workers, tempdir))
@@ -119,22 +99,19 @@ def build_export_dag(
             )
 
             copy_to_export_path(
-                os.path.join(tempdir, "blocks_meta.txt"), export_path("blocks_meta", execution_date)
-            )
-
-            copy_to_export_path(
                 os.path.join(tempdir, "beacon_blocks.json"), export_path("beacon_blocks", execution_date)
             )
 
     def export_beacon_validators_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
+            start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
-            logging.info('Calling export_beacon_validators({}, {}, {})'.format(
-                provider_uri, export_max_workers, tempdir))
+            logging.info('Calling export_beacon_validators({}, {}, {}, {}, {})'.format(
+                start_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
 
             export_beacon_validators.callback(
-                start_epoch=None,
-                end_epoch=None,
+                start_epoch=start_epoch,
+                end_epoch=end_epoch,
                 provider_uri=provider_uri,
                 rate_limit=export_rate_limit,
                 max_workers=export_max_workers,
@@ -146,9 +123,34 @@ def build_export_dag(
                 os.path.join(tempdir, "beacon_validators.json"), export_path("beacon_validators", execution_date)
             )
 
+    def export_beacon_validators_hourly_command(execution_date, provider_uri, **kwargs):
+        with TemporaryDirectory() as tempdir:
+            start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
+
+            logging.info('Calling export_beacon_validators({}, {}, {}, {}, {})'.format(
+                end_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
+
+            export_beacon_validators.callback(
+                start_epoch=end_epoch,
+                end_epoch=end_epoch,
+                provider_uri=provider_uri,
+                rate_limit=export_rate_limit,
+                max_workers=export_max_workers,
+                output_dir=tempdir,
+                output_format='json'
+            )
+
+            copy_to_export_path(
+                os.path.join(tempdir, "beacon_validators.json"), export_path("beacon_validators_hourly", execution_date)
+            )
+
+            copy_to_export_path(
+                os.path.join(tempdir, "beacon_validators.json"), export_path_for_tag("beacon_validators_latest", "latest")
+            )
+
     def export_beacon_committees_command(execution_date, provider_uri, **kwargs):
         with TemporaryDirectory() as tempdir:
-            start_epoch, end_epoch = get_epoch_range(tempdir, execution_date, provider_uri)
+            start_epoch, end_epoch = get_epoch_range_for_hour(provider_uri, export_rate_limit, execution_date)
 
             logging.info('Calling export_beacon_committees({}, {}, {}, {})'.format(
                 start_epoch, end_epoch, provider_uri, export_max_workers, tempdir))
@@ -200,6 +202,12 @@ def build_export_dag(
 
     add_export_task(
         True,
+        "export_beacon_validators_hourly",
+        add_provider_uri_fallback_loop(export_beacon_validators_hourly_command, provider_uris),
+    )
+
+    add_export_task(
+        True,
         "export_beacon_committees",
         add_provider_uri_fallback_loop(export_beacon_committees_command, provider_uris),
     )
@@ -222,3 +230,25 @@ def add_provider_uri_fallback_loop(python_callable, provider_uris):
                     raise e
 
     return python_callable_with_fallback
+
+
+def get_block_range_for_hour(provider_uri, rate_limit, execution_date):
+    api = build_api(provider_uri, rate_limit)
+    ethereum2_service = Ethereum2Service(api)
+
+    ethereum2_block_range_service = Ethereum2BlockRangeService(ethereum2_service)
+
+    start_datetime = execution_date.replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+    end_datetime = execution_date.replace(minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+    return ethereum2_block_range_service.get_block_range_for_timestamps(start_datetime.timestamp(), end_datetime.timestamp())
+
+
+def get_epoch_range_for_hour(provider_uri, rate_limit, execution_date):
+    api = build_api(provider_uri, rate_limit)
+    ethereum2_service = Ethereum2Service(api)
+
+    ethereum2_epoch_range_service = Ethereum2EpochRangeService(ethereum2_service)
+
+    start_datetime = execution_date.replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+    end_datetime = execution_date.replace(minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+    return ethereum2_epoch_range_service.get_epoch_range_for_timestamps(start_datetime.timestamp(), end_datetime.timestamp())
